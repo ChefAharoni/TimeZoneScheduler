@@ -24,6 +24,11 @@
   const endtimeFields = document.getElementById("endtime-fields");
   const endTypeRadios = document.getElementsByName("end-type");
   const baseTzSearch = document.getElementById("base-tz-search");
+  const tzTableContainer = document.getElementById("tz-table-container");
+  const tzTable = document.getElementById("tz-table");
+  const tzTableBody = tzTable ? tzTable.querySelector("tbody") : null;
+  const originTzHeader = document.getElementById("origin-tz-header");
+  const targetTzHeader = document.getElementById("target-tz-header");
 
   // Set default date to today
   dateInput.valueAsDate = new Date();
@@ -137,6 +142,7 @@
     baseTzSelect.value = userTimezone;
     targetTzSelect.value = "UTC";
     updateTzSelectedFeedback();
+    generateTzTable();
   }
 
   // --- Target Time Zone Selection Feedback ---
@@ -467,4 +473,78 @@
       updateTzSelectedFeedback();
     }
   });
+
+  // --- Time Zone Comparison Table ---
+  function generateTzTable() {
+    if (!tzTableBody) return;
+    tzTableBody.innerHTML = "";
+    const originTz = baseTzSelect.value;
+    const targetTz = targetTzSelect.value;
+    let date = dateInput.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      date = DateTime.now().toFormat("yyyy-MM-dd");
+    }
+    // Update headers
+    originTzHeader.textContent = formatTimezoneOption(originTz);
+    targetTzHeader.textContent = formatTimezoneOption(targetTz);
+
+    // Starting point: midnight in origin tz
+    let startOfDay = DateTime.fromFormat(`${date} 00:00`, "yyyy-MM-dd HH:mm", {
+      zone: originTz,
+    });
+    if (!startOfDay.isValid) {
+      startOfDay = DateTime.now().setZone(originTz).startOf("day");
+    }
+
+    // Determine selected row index for highlighting
+    let selectedRowIndex = -1;
+    if (timeInput.value) {
+      const selectedTime = DateTime.fromFormat(
+        `${date} ${timeInput.value}`,
+        "yyyy-MM-dd HH:mm",
+        { zone: originTz }
+      );
+      if (selectedTime.isValid) {
+        const diffMinutes = selectedTime.diff(startOfDay, "minutes").minutes;
+        selectedRowIndex = Math.round(diffMinutes / 15);
+      }
+    }
+
+    const rowsFragment = document.createDocumentFragment();
+    for (let i = 0; i < 96; i++) {
+      // 96 * 15-minute slots
+      const originTime = startOfDay.plus({ minutes: 15 * i });
+      const targetTime = originTime.setZone(targetTz);
+      const tr = document.createElement("tr");
+      if (i === selectedRowIndex) tr.classList.add("selected");
+      const tdOrigin = document.createElement("td");
+      tdOrigin.textContent = originTime.toFormat("HH:mm");
+      const tdTarget = document.createElement("td");
+      tdTarget.textContent = targetTime.toFormat("HH:mm");
+      tr.appendChild(tdOrigin);
+      tr.appendChild(tdTarget);
+      tr.addEventListener("click", () => {
+        timeInput.value = originTime.toFormat("HH:mm");
+        dateInput.value = originTime.toFormat("yyyy-MM-dd");
+        Array.from(tzTableBody.children).forEach((row) =>
+          row.classList.remove("selected")
+        );
+        tr.classList.add("selected");
+        tr.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+      rowsFragment.appendChild(tr);
+    }
+    tzTableBody.appendChild(rowsFragment);
+  }
+
+  // Regenerate table on relevant changes
+  [baseTzSelect, targetTzSelect, dateInput].forEach((el) => {
+    if (el) el.addEventListener("change", generateTzTable);
+  });
+  if (timeInput) timeInput.addEventListener("change", generateTzTable);
+
+  // Also regenerate on search selection
+  baseTzSelect.addEventListener("change", generateTzTable);
+  targetTzSelect.addEventListener("change", generateTzTable);
+  dateInput.addEventListener("change", generateTzTable);
 })();
