@@ -46,12 +46,17 @@
       </div>
 
       <div class="field-group">
-        <label for="base-tz">Your Time Zone</label>
-        <select id="base-tz"></select>
+        <label for="base-tz">Your Time Zone (Auto-detected)</label>
+        <select id="base-tz" disabled></select>
       </div>
       <div class="field-group">
         <label for="target-tz">Target Time Zone</label>
-        <select id="target-tz"></select>
+        <input
+          type="text"
+          id="timezone-search"
+          placeholder="Search timezone..."
+        />
+        <select id="target-tz" size="5"></select>
       </div>
 
       <div class="field-group">

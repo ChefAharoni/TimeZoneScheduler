@@ -3,6 +3,7 @@
   const { DateTime } = luxon;
   const baseTzSelect = document.getElementById("base-tz");
   const targetTzSelect = document.getElementById("target-tz");
+  const timezoneSearch = document.getElementById("timezone-search");
   const dateInput = document.getElementById("date");
   const timeInput = document.getElementById("time");
   const eventNameInput = document.getElementById("event-name");
@@ -18,26 +19,56 @@
   // Set default date to today
   dateInput.valueAsDate = new Date();
 
+  // Get GMT offset for a timezone
+  function getGMTOffset(timezone) {
+    const now = DateTime.now().setZone(timezone);
+    const offset = now.toFormat("ZZZZ");
+    return offset;
+  }
+
+  // Format timezone option text with GMT offset
+  function formatTimezoneOption(timezone) {
+    const offset = getGMTOffset(timezone);
+    return `${timezone} (${offset})`;
+  }
+
   // Populate time zones
   function populateTimeZones() {
     const timeZones = Intl.supportedValuesOf("timeZone");
     timeZones.sort();
 
+    // Set user's timezone
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    baseTzSelect.value = userTimezone;
+    baseTzSelect.textContent = formatTimezoneOption(userTimezone);
+
+    // Populate target timezone select
     timeZones.forEach((tz) => {
-      const baseOption = document.createElement("option");
-      const targetOption = document.createElement("option");
-
-      baseOption.value = targetOption.value = tz;
-      baseOption.textContent = targetOption.textContent = tz;
-
-      baseTzSelect.appendChild(baseOption);
-      targetTzSelect.appendChild(targetOption);
+      const option = document.createElement("option");
+      option.value = tz;
+      option.textContent = formatTimezoneOption(tz);
+      targetTzSelect.appendChild(option);
     });
 
-    // Set default time zones
-    baseTzSelect.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Set default target timezone to UTC
     targetTzSelect.value = "UTC";
   }
+
+  // Handle timezone search
+  function filterTimezones(searchTerm) {
+    const options = targetTzSelect.options;
+    searchTerm = searchTerm.toLowerCase();
+
+    for (let i = 0; i < options.length; i++) {
+      const option = options[i];
+      const text = option.textContent.toLowerCase();
+      option.style.display = text.includes(searchTerm) ? "" : "none";
+    }
+  }
+
+  timezoneSearch.addEventListener("input", (e) => {
+    filterTimezones(e.target.value);
+  });
 
   // Handle event duration selection
   eventDurationSelect.addEventListener("change", () => {
