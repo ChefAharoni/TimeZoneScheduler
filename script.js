@@ -54,23 +54,22 @@
     }
   }
 
-  // Format timezone option text with GMT offset
+  // Format timezone option text with GMT offset and pretty city name
   function formatTimezoneOption(timezone) {
     const offset = getGMTOffset(timezone);
-    return `${timezone} (${offset})`;
+    // Replace underscores with spaces for display
+    const prettyTz = timezone.replace(/_/g, " ");
+    return `${prettyTz} (${offset})`;
   }
 
   // Detect user's timezone with fallbacks
   function detectUserTimezone() {
-    // Try browser's timezone detection
     try {
       const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (browserTz) return browserTz;
     } catch (e) {
       console.warn("Browser timezone detection failed:", e);
     }
-
-    // Fallback to system time
     try {
       const date = new Date();
       const offset = -date.getTimezoneOffset();
@@ -80,8 +79,6 @@
       const gmtOffset = `GMT${sign}${hours
         .toString()
         .padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-
-      // Try to find a matching timezone from our list
       const matchingTz = commonCityTimezones.find((tz) => {
         try {
           return DateTime.now().setZone(tz).toFormat("ZZZZ") === gmtOffset;
@@ -89,19 +86,15 @@
           return false;
         }
       });
-
       if (matchingTz) return matchingTz;
     } catch (e) {
       console.warn("System time fallback failed:", e);
     }
-
-    // Final fallback to New York
     return "America/New_York";
   }
 
   // Populate time zones
   function populateTimeZones() {
-    // Get all available timezones
     let timeZones = [];
     try {
       timeZones = Intl.supportedValuesOf("timeZone");
@@ -109,41 +102,48 @@
       console.warn("Failed to get supported timezones:", e);
       timeZones = commonCityTimezones;
     }
-
-    // Ensure common cities are included
     timeZones = [...new Set([...commonCityTimezones, ...timeZones])];
     timeZones.sort();
-
-    // Set user's timezone
     const userTimezone = detectUserTimezone();
-
     // Populate both selects
     timeZones.forEach((tz) => {
       const baseOption = document.createElement("option");
       const targetOption = document.createElement("option");
-
       baseOption.value = targetOption.value = tz;
       baseOption.textContent = targetOption.textContent =
         formatTimezoneOption(tz);
-
+      // Store searchable text for each option (with and without underscores)
+      baseOption.setAttribute(
+        "data-search",
+        `${tz.toLowerCase()} ${tz.replace(/_/g, " ").toLowerCase()}`
+      );
+      targetOption.setAttribute(
+        "data-search",
+        `${tz.toLowerCase()} ${tz.replace(/_/g, " ").toLowerCase()}`
+      );
       baseTzSelect.appendChild(baseOption);
       targetTzSelect.appendChild(targetOption);
     });
-
-    // Set detected timezone
     baseTzSelect.value = userTimezone;
     targetTzSelect.value = "UTC";
   }
 
-  // Handle timezone search
+  // Handle timezone search (matches both underscores and spaces)
   function filterTimezones(searchTerm) {
     const options = targetTzSelect.options;
-    searchTerm = searchTerm.toLowerCase();
-
+    searchTerm = searchTerm.toLowerCase().replace(/ /g, "_");
     for (let i = 0; i < options.length; i++) {
       const option = options[i];
-      const text = option.textContent.toLowerCase();
-      option.style.display = text.includes(searchTerm) ? "" : "none";
+      // Search both the original and pretty version
+      const searchAttr = option.getAttribute("data-search");
+      const prettyText = option.textContent.toLowerCase();
+      // Allow search by either underscores or spaces
+      const searchMatch =
+        searchAttr.includes(searchTerm.replace(/_/g, " ")) ||
+        searchAttr.includes(searchTerm) ||
+        prettyText.includes(searchTerm.replace(/_/g, " ")) ||
+        prettyText.includes(searchTerm);
+      option.style.display = searchMatch ? "" : "none";
     }
   }
 
@@ -151,37 +151,30 @@
     filterTimezones(e.target.value);
   });
 
-  // Handle event duration selection
   eventDurationSelect.addEventListener("change", () => {
     customDurationGroup.style.display =
       eventDurationSelect.value === "custom" ? "block" : "none";
   });
 
-  // Handle invitees
   function addInviteeRow() {
     const row = document.createElement("div");
     row.className = "invitee-row";
-
     const emailInput = document.createElement("input");
     emailInput.type = "email";
     emailInput.className = "invitee-email";
     emailInput.placeholder = "email@example.com";
-
     const removeButton = document.createElement("button");
     removeButton.type = "button";
     removeButton.className = "remove-invitee";
     removeButton.textContent = "×";
     removeButton.style.display = "block";
-
     removeButton.addEventListener("click", () => {
       row.remove();
       updateRemoveButtons();
     });
-
     row.appendChild(emailInput);
     row.appendChild(removeButton);
     inviteesContainer.appendChild(row);
-
     updateRemoveButtons();
   }
 
@@ -195,7 +188,6 @@
 
   addInviteeButton.addEventListener("click", addInviteeRow);
 
-  // Generate ICS file
   function generateICS() {
     const eventName = eventNameInput.value;
     const eventLocation = eventLocationInput.value;
@@ -204,32 +196,21 @@
     const targetTz = targetTzSelect.value;
     const date = dateInput.value;
     const time = timeInput.value;
-
-    // Calculate duration in minutes
     let durationMinutes = parseInt(eventDurationSelect.value);
     if (eventDurationSelect.value === "custom") {
       durationMinutes = parseInt(customDurationInput.value);
     }
-
-    // Create start and end times
     const startTime = DateTime.fromFormat(
       `${date} ${time}`,
       "yyyy-MM-dd HH:mm",
       { zone: baseTz }
     );
-
     const endTime = startTime.plus({ minutes: durationMinutes });
-
-    // Convert to target timezone
     const targetStartTime = startTime.setZone(targetTz);
     const targetEndTime = endTime.setZone(targetTz);
-
-    // Get all invitee emails
     const invitees = Array.from(document.querySelectorAll(".invitee-email"))
       .map((input) => input.value)
       .filter((email) => email.trim() !== "");
-
-    // Create ICS content
     const icsContent = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
@@ -247,8 +228,6 @@
       "END:VEVENT",
       "END:VCALENDAR",
     ].join("\r\n");
-
-    // Create and download file
     const blob = new Blob([icsContent], {
       type: "text/calendar;charset=utf-8",
     });
@@ -262,7 +241,6 @@
     document.body.removeChild(link);
   }
 
-  // Initialize
   populateTimeZones();
   generateButton.addEventListener("click", generateICS);
 })();
