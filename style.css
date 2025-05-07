@@ -175,3 +175,40 @@ button:hover {
   color: #666;
   font-size: 0.875rem;
 }
+
+.tz-selected-feedback {
+  margin-top: 0.5rem;
+  color: #2980b9;
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+#target-tz option[selected],
+#target-tz option:checked {
+  background-color: #b3d4fc !important;
+  color: #222;
+}
+
+#timed-event-fields[hidden],
+#duration-fields[hidden],
+#endtime-fields[hidden],
+#custom-duration-group[hidden] {
+  display: none !important;
+}
+
+#endtime-fields {
+  margin-top: 0.5rem;
+}
+
+#duration-fields,
+#endtime-fields {
+  transition: all 0.2s;
+}
+
+label input[type="radio"] {
+  margin-right: 0.3em;
+}
+
+label input[type="checkbox"] {
+  margin-right: 0.5em;
+}
