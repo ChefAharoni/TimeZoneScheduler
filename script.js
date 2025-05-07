@@ -23,6 +23,7 @@
   const durationFields = document.getElementById("duration-fields");
   const endtimeFields = document.getElementById("endtime-fields");
   const endTypeRadios = document.getElementsByName("end-type");
+  const baseTzSearch = document.getElementById("base-tz-search");
 
   // Set default date to today
   dateInput.valueAsDate = new Date();
@@ -206,11 +207,20 @@
     } else {
       durationFields.setAttribute("hidden", "");
       endtimeFields.removeAttribute("hidden");
+      // Always set end date to start date if not set
+      if (
+        dateInput.value &&
+        (!endDateInput.value || endDateInput.value < dateInput.value)
+      ) {
+        endDateInput.value = dateInput.value;
+      }
     }
   }
   endTypeRadios.forEach((radio) =>
     radio.addEventListener("change", updateEndTypeFields)
   );
+  // Ensure correct fields are shown on page load
+  updateEndTypeFields();
 
   // --- End Date Auto-Update Logic ---
   function updateEndDateIfNeeded() {
@@ -396,4 +406,65 @@
   populateTimeZones();
   generateButton.addEventListener("click", generateICS);
   updateEndTypeFields();
+
+  // --- Base Time Zone Search ---
+  function filterBaseTimezones(searchTerm) {
+    const options = baseTzSelect.options;
+    searchTerm = searchTerm.toLowerCase().replace(/ /g, "_");
+    for (let i = 0; i < options.length; i++) {
+      const option = options[i];
+      const searchAttr = option.getAttribute("data-search");
+      const prettyText = option.textContent.toLowerCase();
+      const searchMatch =
+        searchAttr.includes(searchTerm.replace(/_/g, " ")) ||
+        searchAttr.includes(searchTerm) ||
+        prettyText.includes(searchTerm.replace(/_/g, " ")) ||
+        prettyText.includes(searchTerm);
+      option.style.display = searchMatch ? "" : "none";
+    }
+  }
+  baseTzSearch.addEventListener("input", (e) => {
+    filterBaseTimezones(e.target.value);
+    // Auto-select first visible option
+    const firstVisible = Array.from(baseTzSelect.options).find(
+      (opt) => opt.style.display !== "none"
+    );
+    if (firstVisible) {
+      baseTzSelect.value = firstVisible.value;
+    }
+  });
+  // Close search bar on selection
+  baseTzSelect.addEventListener("change", function () {
+    baseTzSearch.value = "";
+    baseTzSearch.blur();
+  });
+  baseTzSelect.addEventListener("click", function () {
+    baseTzSearch.value = "";
+    baseTzSearch.blur();
+  });
+  baseTzSelect.addEventListener("keyup", function (e) {
+    if (e.key === "Enter" || e.key === "Tab") {
+      baseTzSearch.value = "";
+      baseTzSearch.blur();
+    }
+  });
+
+  // Close target search bar on selection
+  targetTzSelect.addEventListener("change", function () {
+    timezoneSearch.value = "";
+    timezoneSearch.blur();
+    updateTzSelectedFeedback();
+  });
+  targetTzSelect.addEventListener("click", function () {
+    timezoneSearch.value = "";
+    timezoneSearch.blur();
+    updateTzSelectedFeedback();
+  });
+  targetTzSelect.addEventListener("keyup", function (e) {
+    if (e.key === "Enter" || e.key === "Tab") {
+      timezoneSearch.value = "";
+      timezoneSearch.blur();
+      updateTzSelectedFeedback();
+    }
+  });
 })();

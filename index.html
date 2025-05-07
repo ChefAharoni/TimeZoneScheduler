@@ -47,6 +47,11 @@
 
       <div class="field-group">
         <label for="base-tz">Your Time Zone</label>
+        <input
+          type="text"
+          id="base-tz-search"
+          placeholder="Search timezone..."
+        />
         <select id="base-tz"></select>
         <small class="timezone-note">Auto-detected from your system</small>
       </div>
@@ -107,7 +112,7 @@
           <label for="custom-duration">Custom Duration (minutes)</label>
           <input type="number" id="custom-duration" min="1" value="60" />
         </div>
-        <div class="field-group" id="endtime-fields" style="display: none">
+        <div class="field-group" id="endtime-fields">
           <label for="end-date">End Date</label>
           <input type="date" id="end-date" />
           <label for="end-time">End Time</label>
