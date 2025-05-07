@@ -19,11 +19,39 @@
   // Set default date to today
   dateInput.valueAsDate = new Date();
 
+  // Common city timezones to ensure they're included
+  const commonCityTimezones = [
+    "Asia/Tel_Aviv",
+    "Asia/Jerusalem",
+    "America/New_York",
+    "America/Los_Angeles",
+    "America/Chicago",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Berlin",
+    "Asia/Tokyo",
+    "Asia/Shanghai",
+    "Asia/Singapore",
+    "Australia/Sydney",
+    "Pacific/Auckland",
+    "Asia/Dubai",
+    "Asia/Kolkata",
+    "Europe/Moscow",
+    "America/Sao_Paulo",
+    "Africa/Johannesburg",
+    "Asia/Bangkok",
+    "Asia/Seoul",
+  ];
+
   // Get GMT offset for a timezone
   function getGMTOffset(timezone) {
-    const now = DateTime.now().setZone(timezone);
-    const offset = now.toFormat("ZZZZ");
-    return offset;
+    try {
+      const now = DateTime.now().setZone(timezone);
+      const offset = now.toFormat("ZZZZ");
+      return offset;
+    } catch (e) {
+      return "Unknown";
+    }
   }
 
   // Format timezone option text with GMT offset
@@ -32,25 +60,78 @@
     return `${timezone} (${offset})`;
   }
 
+  // Detect user's timezone with fallbacks
+  function detectUserTimezone() {
+    // Try browser's timezone detection
+    try {
+      const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (browserTz) return browserTz;
+    } catch (e) {
+      console.warn("Browser timezone detection failed:", e);
+    }
+
+    // Fallback to system time
+    try {
+      const date = new Date();
+      const offset = -date.getTimezoneOffset();
+      const hours = Math.floor(Math.abs(offset) / 60);
+      const minutes = Math.abs(offset) % 60;
+      const sign = offset >= 0 ? "+" : "-";
+      const gmtOffset = `GMT${sign}${hours
+        .toString()
+        .padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+
+      // Try to find a matching timezone from our list
+      const matchingTz = commonCityTimezones.find((tz) => {
+        try {
+          return DateTime.now().setZone(tz).toFormat("ZZZZ") === gmtOffset;
+        } catch (e) {
+          return false;
+        }
+      });
+
+      if (matchingTz) return matchingTz;
+    } catch (e) {
+      console.warn("System time fallback failed:", e);
+    }
+
+    // Final fallback to New York
+    return "America/New_York";
+  }
+
   // Populate time zones
   function populateTimeZones() {
-    const timeZones = Intl.supportedValuesOf("timeZone");
+    // Get all available timezones
+    let timeZones = [];
+    try {
+      timeZones = Intl.supportedValuesOf("timeZone");
+    } catch (e) {
+      console.warn("Failed to get supported timezones:", e);
+      timeZones = commonCityTimezones;
+    }
+
+    // Ensure common cities are included
+    timeZones = [...new Set([...commonCityTimezones, ...timeZones])];
     timeZones.sort();
 
     // Set user's timezone
-    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    baseTzSelect.value = userTimezone;
-    baseTzSelect.textContent = formatTimezoneOption(userTimezone);
+    const userTimezone = detectUserTimezone();
 
-    // Populate target timezone select
+    // Populate both selects
     timeZones.forEach((tz) => {
-      const option = document.createElement("option");
-      option.value = tz;
-      option.textContent = formatTimezoneOption(tz);
-      targetTzSelect.appendChild(option);
+      const baseOption = document.createElement("option");
+      const targetOption = document.createElement("option");
+
+      baseOption.value = targetOption.value = tz;
+      baseOption.textContent = targetOption.textContent =
+        formatTimezoneOption(tz);
+
+      baseTzSelect.appendChild(baseOption);
+      targetTzSelect.appendChild(targetOption);
     });
 
-    // Set default target timezone to UTC
+    // Set detected timezone
+    baseTzSelect.value = userTimezone;
     targetTzSelect.value = "UTC";
   }
 
