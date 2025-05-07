@@ -248,3 +248,6 @@ label input[type="checkbox"] {
 #tz-table td {
   user-select: none;
 }
+#tz-table tr.range-selected {
+  background: #d0eaff !important;
+}

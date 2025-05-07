@@ -455,23 +455,34 @@
     }
   });
 
-  // Close target search bar on selection
-  targetTzSelect.addEventListener("change", function () {
-    timezoneSearch.value = "";
-    timezoneSearch.blur();
-    updateTzSelectedFeedback();
-  });
-  targetTzSelect.addEventListener("click", function () {
-    timezoneSearch.value = "";
-    timezoneSearch.blur();
-    updateTzSelectedFeedback();
-  });
-  targetTzSelect.addEventListener("keyup", function (e) {
-    if (e.key === "Enter" || e.key === "Tab") {
-      timezoneSearch.value = "";
-      timezoneSearch.blur();
-      updateTzSelectedFeedback();
+  // Helper to collapse/expand target select
+  function showTargetSelect(expand) {
+    if (expand) {
+      targetTzSelect.size = 5;
+      targetTzSelect.style.display = "";
+    } else {
+      targetTzSelect.size = 1;
+      targetTzSelect.style.display = "";
     }
+  }
+
+  // Expand list when searching
+  timezoneSearch.addEventListener("focus", () => showTargetSelect(true));
+  timezoneSearch.addEventListener("input", () => showTargetSelect(true));
+  // Collapse list when a timezone is chosen
+  function collapseTargetList() {
+    showTargetSelect(false);
+    timezoneSearch.value = "";
+    timezoneSearch.blur();
+  }
+  targetTzSelect.addEventListener("change", () => {
+    collapseTargetList();
+    updateTzSelectedFeedback();
+    generateTzTable();
+  });
+  targetTzSelect.addEventListener("click", () => {
+    collapseTargetList();
+    updateTzSelectedFeedback();
   });
 
   // --- Time Zone Comparison Table ---
@@ -516,22 +527,33 @@
       const originTime = startOfDay.plus({ minutes: 15 * i });
       const targetTime = originTime.setZone(targetTz);
       const tr = document.createElement("tr");
-      if (i === selectedRowIndex) tr.classList.add("selected");
+      tr.dataset.index = i;
+      const inSelectedRange = selectedRowIndex !== -1 && i === selectedRowIndex;
+      if (inSelectedRange) tr.classList.add("selected");
       const tdOrigin = document.createElement("td");
       tdOrigin.textContent = originTime.toFormat("HH:mm");
       const tdTarget = document.createElement("td");
       tdTarget.textContent = targetTime.toFormat("HH:mm");
       tr.appendChild(tdOrigin);
       tr.appendChild(tdTarget);
-      tr.addEventListener("click", () => {
+      const clickHandler = () => {
+        // Treat as single-slot selection
+        selectedStartIndex = i;
+        selectedEndIndex = i;
+        // Update form fields
         timeInput.value = originTime.toFormat("HH:mm");
         dateInput.value = originTime.toFormat("yyyy-MM-dd");
-        Array.from(tzTableBody.children).forEach((row) =>
-          row.classList.remove("selected")
-        );
-        tr.classList.add("selected");
-        tr.scrollIntoView({ block: "center", behavior: "smooth" });
-      });
+        // Switch to Duration 15 minutes default or endtime next slot
+        const nextTime = originTime.plus({ minutes: 15 });
+        endTimeInput.value = nextTime.toFormat("HH:mm");
+        endDateInput.value = nextTime.toFormat("yyyy-MM-dd");
+        document.querySelector(
+          'input[name="end-type"][value="endtime"]'
+        ).checked = true;
+        updateEndTypeFields();
+        generateTzTable();
+      };
+      tr.addEventListener("click", clickHandler);
       rowsFragment.appendChild(tr);
     }
     tzTableBody.appendChild(rowsFragment);
@@ -547,4 +569,88 @@
   baseTzSelect.addEventListener("change", generateTzTable);
   targetTzSelect.addEventListener("change", generateTzTable);
   dateInput.addEventListener("change", generateTzTable);
+
+  // Variables for drag selection
+  let dragStartIndex = null;
+  let dragCurrentIndex = null;
+  let isDragging = false;
+  let selectedStartIndex = null;
+  let selectedEndIndex = null;
+
+  function updateRangeHighlight() {
+    Array.from(tzTableBody.children).forEach((row) => {
+      const idx = parseInt(row.dataset.index, 10);
+      const inDragRange =
+        isDragging &&
+        dragStartIndex !== null &&
+        dragCurrentIndex !== null &&
+        idx >= Math.min(dragStartIndex, dragCurrentIndex) &&
+        idx <= Math.max(dragStartIndex, dragCurrentIndex);
+      const inSelectedRange =
+        selectedStartIndex !== null &&
+        selectedEndIndex !== null &&
+        idx >= selectedStartIndex &&
+        idx <= selectedEndIndex;
+      row.classList.toggle("range-selected", inDragRange || inSelectedRange);
+    });
+  }
+
+  function finalizeSelection() {
+    if (dragStartIndex === null || dragCurrentIndex === null) return;
+    selectedStartIndex = Math.min(dragStartIndex, dragCurrentIndex);
+    selectedEndIndex = Math.max(dragStartIndex, dragCurrentIndex);
+
+    const originTz = baseTzSelect.value;
+    let date = dateInput.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      date = DateTime.now().toFormat("yyyy-MM-dd");
+    }
+    let startOfDay = DateTime.fromFormat(`${date} 00:00`, "yyyy-MM-dd HH:mm", {
+      zone: originTz,
+    });
+    if (!startOfDay.isValid)
+      startOfDay = DateTime.now().setZone(originTz).startOf("day");
+
+    const startTime = startOfDay.plus({ minutes: 15 * selectedStartIndex });
+    const endTime = startOfDay.plus({ minutes: 15 * (selectedEndIndex + 1) });
+
+    // Update form fields
+    timeInput.value = startTime.toFormat("HH:mm");
+    dateInput.value = startTime.toFormat("yyyy-MM-dd");
+    endTimeInput.value = endTime.toFormat("HH:mm");
+    endDateInput.value = endTime.toFormat("yyyy-MM-dd");
+
+    // Switch to End Time mode
+    document.querySelector(
+      'input[name="end-type"][value="endtime"]'
+    ).checked = true;
+    updateEndTypeFields();
+
+    generateTzTable(); // refresh highlights
+  }
+
+  // Event delegation for drag selection
+  tzTableBody.addEventListener("mousedown", (e) => {
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+    isDragging = true;
+    dragStartIndex = parseInt(tr.dataset.index, 10);
+    dragCurrentIndex = dragStartIndex;
+    updateRangeHighlight();
+  });
+
+  tzTableBody.addEventListener("mouseover", (e) => {
+    if (!isDragging) return;
+    const tr = e.target.closest("tr");
+    if (!tr) return;
+    dragCurrentIndex = parseInt(tr.dataset.index, 10);
+    updateRangeHighlight();
+  });
+
+  document.addEventListener("mouseup", () => {
+    if (!isDragging) return;
+    isDragging = false;
+    finalizeSelection();
+    dragStartIndex = dragCurrentIndex = null;
+  });
 })();
