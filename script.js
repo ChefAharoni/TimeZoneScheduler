@@ -162,13 +162,20 @@
   }
 
   // When user clicks or changes selection in the target time zone
-  targetTzSelect.addEventListener("change", updateTzSelectedFeedback);
-  targetTzSelect.addEventListener("click", function (e) {
+  targetTzSelect.addEventListener("change", () => {
+    collapseTargetList();
     updateTzSelectedFeedback();
-    targetTzSelect.blur(); // visually closes the select on click
+    generateTzTable();
   });
-  // Also allow keyboard selection
-  targetTzSelect.addEventListener("keyup", updateTzSelectedFeedback);
+  targetTzSelect.addEventListener("click", () => {
+    collapseTargetList();
+    updateTzSelectedFeedback();
+    generateTzTable();
+  });
+  targetTzSelect.addEventListener("keyup", () => {
+    updateTzSelectedFeedback();
+    generateTzTable();
+  });
 
   // When user types in the search, filter and auto-select first visible
   timezoneSearch.addEventListener("input", (e) => {
@@ -483,15 +490,6 @@
     timezoneSearch.value = "";
     timezoneSearch.blur();
   }
-  targetTzSelect.addEventListener("change", () => {
-    collapseTargetList();
-    updateTzSelectedFeedback();
-    generateTzTable();
-  });
-  targetTzSelect.addEventListener("click", () => {
-    collapseTargetList();
-    updateTzSelectedFeedback();
-  });
 
   // --- Time Zone Comparison Table ---
   function generateTzTable() {
