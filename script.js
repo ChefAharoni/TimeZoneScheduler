@@ -385,8 +385,10 @@
       "PRODID:-//TimeSync//EN",
       "CALSCALE:GREGORIAN",
       "BEGIN:VEVENT",
-      `DTSTART:${targetStartTime.toFormat("yyyyMMdd'T'HHmmss")}`,
-      `DTEND:${targetEndTime.toFormat("yyyyMMdd'T'HHmmss")}`,
+      `DTSTART;TZID=${targetTz}:${targetStartTime.toFormat(
+        "yyyyMMdd'T'HHmmss"
+      )}`,
+      `DTEND;TZID=${targetTz}:${targetEndTime.toFormat("yyyyMMdd'T'HHmmss")}`,
       `SUMMARY:${eventName}`,
       `LOCATION:${eventLocation}`,
       `DESCRIPTION:${eventDetails}`,
