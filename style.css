@@ -251,3 +251,75 @@ label input[type="checkbox"] {
 #tz-table tr.range-selected {
   background: #d0eaff !important;
 }
+
+/* Additional Timezone Styles */
+.additional-timezone {
+  position: relative;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fafbfc;
+}
+
+.timezone-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.remove-timezone {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.remove-timezone:hover {
+  background-color: #c0392b;
+}
+
+.timezone-search {
+  margin-bottom: 0.5rem;
+}
+
+.timezone-select {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+#add-timezone {
+  margin-bottom: 1.5rem;
+}
+
+/* Update table styles for multiple timezones */
+#tz-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+#tz-table th {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.5rem;
+  font-size: 0.9rem;
+}
+
+#tz-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.4rem;
+  font-size: 0.9rem;
+}

@@ -29,6 +29,10 @@
   const tzTableBody = tzTable ? tzTable.querySelector("tbody") : null;
   const originTzHeader = document.getElementById("origin-tz-header");
   const targetTzHeader = document.getElementById("target-tz-header");
+  const additionalTimezonesContainer = document.getElementById(
+    "additional-timezones"
+  );
+  const addTimezoneButton = document.getElementById("add-timezone");
 
   // Set default date to today
   dateInput.valueAsDate = new Date();
@@ -108,20 +112,22 @@
     return "America/New_York";
   }
 
+  // Get all available timezones
+  let allTimeZones = [];
+  try {
+    allTimeZones = Intl.supportedValuesOf("timeZone");
+  } catch (e) {
+    console.warn("Failed to get supported timezones:", e);
+    allTimeZones = commonCityTimezones;
+  }
+  allTimeZones = [...new Set([...commonCityTimezones, ...allTimeZones])];
+  allTimeZones.sort();
+
   // Populate time zones
   function populateTimeZones() {
-    let timeZones = [];
-    try {
-      timeZones = Intl.supportedValuesOf("timeZone");
-    } catch (e) {
-      console.warn("Failed to get supported timezones:", e);
-      timeZones = commonCityTimezones;
-    }
-    timeZones = [...new Set([...commonCityTimezones, ...timeZones])];
-    timeZones.sort();
     const userTimezone = detectUserTimezone();
     // Populate both selects
-    timeZones.forEach((tz) => {
+    allTimeZones.forEach((tz) => {
       const baseOption = document.createElement("option");
       const targetOption = document.createElement("option");
       baseOption.value = targetOption.value = tz;
@@ -493,13 +499,32 @@
     tzTableBody.innerHTML = "";
     const originTz = baseTzSelect.value;
     const targetTz = targetTzSelect.value;
+    const additionalTzs = Array.from(
+      document.querySelectorAll(".timezone-select")
+    ).map((select) => select.value);
     let date = dateInput.value;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       date = DateTime.now().toFormat("yyyy-MM-dd");
     }
+
     // Update headers
-    originTzHeader.textContent = formatTimezoneOption(originTz);
-    targetTzHeader.textContent = formatTimezoneOption(targetTz);
+    const headerRow = document.createElement("tr");
+    const originHeader = document.createElement("th");
+    originHeader.textContent = formatTimezoneOption(originTz);
+    headerRow.appendChild(originHeader);
+
+    const targetHeader = document.createElement("th");
+    targetHeader.textContent = formatTimezoneOption(targetTz);
+    headerRow.appendChild(targetHeader);
+
+    additionalTzs.forEach((tz) => {
+      const th = document.createElement("th");
+      th.textContent = formatTimezoneOption(tz);
+      headerRow.appendChild(th);
+    });
+
+    tzTable.querySelector("thead").innerHTML = "";
+    tzTable.querySelector("thead").appendChild(headerRow);
 
     // Starting point: midnight in origin tz
     let startOfDay = DateTime.fromFormat(`${date} 00:00`, "yyyy-MM-dd HH:mm", {
@@ -525,27 +550,34 @@
 
     const rowsFragment = document.createDocumentFragment();
     for (let i = 0; i < 96; i++) {
-      // 96 * 15-minute slots
       const originTime = startOfDay.plus({ minutes: 15 * i });
-      const targetTime = originTime.setZone(targetTz);
       const tr = document.createElement("tr");
       tr.dataset.index = i;
       const inSelectedRange = selectedRowIndex !== -1 && i === selectedRowIndex;
       if (inSelectedRange) tr.classList.add("selected");
+
+      // Origin time
       const tdOrigin = document.createElement("td");
       tdOrigin.textContent = originTime.toFormat("HH:mm");
-      const tdTarget = document.createElement("td");
-      tdTarget.textContent = targetTime.toFormat("HH:mm");
       tr.appendChild(tdOrigin);
+
+      // Target time
+      const tdTarget = document.createElement("td");
+      tdTarget.textContent = originTime.setZone(targetTz).toFormat("HH:mm");
       tr.appendChild(tdTarget);
+
+      // Additional timezones
+      additionalTzs.forEach((tz) => {
+        const td = document.createElement("td");
+        td.textContent = originTime.setZone(tz).toFormat("HH:mm");
+        tr.appendChild(td);
+      });
+
       const clickHandler = () => {
-        // Treat as single-slot selection
         selectedStartIndex = i;
         selectedEndIndex = i;
-        // Update form fields
         timeInput.value = originTime.toFormat("HH:mm");
         dateInput.value = originTime.toFormat("yyyy-MM-dd");
-        // Switch to Duration 15 minutes default or endtime next slot
         const nextTime = originTime.plus({ minutes: 15 });
         endTimeInput.value = nextTime.toFormat("HH:mm");
         endDateInput.value = nextTime.toFormat("yyyy-MM-dd");
@@ -655,4 +687,85 @@
     finalizeSelection();
     dragStartIndex = dragCurrentIndex = null;
   });
+
+  // Add timezone row
+  function addTimezoneRow() {
+    const timezoneId = `tz-${Date.now()}`;
+    const row = document.createElement("div");
+    row.className = "field-group additional-timezone";
+    row.innerHTML = `
+      <div class="timezone-header">
+        <label>Additional Time Zone</label>
+        <button type="button" class="remove-timezone" data-timezone="${timezoneId}">×</button>
+      </div>
+      <input type="text" class="timezone-search" placeholder="Search timezone..." />
+      <select class="timezone-select" id="${timezoneId}" size="5"></select>
+      <div class="tz-selected-feedback"></div>
+    `;
+
+    // Populate the select with timezones
+    const select = row.querySelector(".timezone-select");
+    allTimeZones.forEach((tz) => {
+      const option = document.createElement("option");
+      option.value = tz;
+      option.textContent = formatTimezoneOption(tz);
+      option.setAttribute(
+        "data-search",
+        `${tz.toLowerCase()} ${tz.replace(/_/g, " ").toLowerCase()}`
+      );
+      select.appendChild(option);
+    });
+
+    // Add event listeners
+    const searchInput = row.querySelector(".timezone-search");
+    const removeButton = row.querySelector(".remove-timezone");
+    const feedback = row.querySelector(".tz-selected-feedback");
+
+    searchInput.addEventListener("input", (e) => {
+      filterAdditionalTimezone(e.target.value, select);
+      const firstVisible = Array.from(select.options).find(
+        (opt) => opt.style.display !== "none"
+      );
+      if (firstVisible) {
+        select.value = firstVisible.value;
+        feedback.textContent = `Selected: ${firstVisible.textContent}`;
+        generateTzTable();
+      }
+    });
+
+    removeButton.addEventListener("click", () => {
+      row.remove();
+      generateTzTable();
+    });
+
+    select.addEventListener("change", () => {
+      const selected = select.options[select.selectedIndex];
+      if (selected) {
+        feedback.textContent = `Selected: ${selected.textContent}`;
+        generateTzTable();
+      }
+    });
+
+    additionalTimezonesContainer.appendChild(row);
+    generateTzTable();
+  }
+
+  function filterAdditionalTimezone(searchTerm, select) {
+    const options = select.options;
+    searchTerm = searchTerm.toLowerCase().replace(/ /g, "_");
+    for (let i = 0; i < options.length; i++) {
+      const option = options[i];
+      const searchAttr = option.getAttribute("data-search");
+      const prettyText = option.textContent.toLowerCase();
+      const searchMatch =
+        searchAttr.includes(searchTerm.replace(/_/g, " ")) ||
+        searchAttr.includes(searchTerm) ||
+        prettyText.includes(searchTerm.replace(/_/g, " ")) ||
+        prettyText.includes(searchTerm);
+      option.style.display = searchMatch ? "" : "none";
+    }
+  }
+
+  // Add event listener for the add timezone button
+  addTimezoneButton.addEventListener("click", addTimezoneRow);
 })();
